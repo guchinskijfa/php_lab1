@@ -20,7 +20,7 @@ RUN set -eux; \
         pgsql \
         zip \
     ; \
-    a2enmod rewrite; \
+    a2enmod rewrite headers; \
     rm -rf /var/lib/apt/lists/*
 
 # Настройка владельца папки (чтобы не было проблем с правами)
@@ -28,7 +28,7 @@ RUN usermod -u 1000 www-data
 
 WORKDIR /var/www/html
 
-# Копируем файлы в контейнер
+# Копируем файлы приложения
 COPY ./app /var/www/html
 
 # Устанавливаем права на папку
