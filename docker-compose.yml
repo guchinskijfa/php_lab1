@@ -1,48 +1,52 @@
 version: '3.8'
 
 services:
-  web:
+  # Apache + PHP сервис
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: lab_web
-    ports:
-      - "${WEB_PORT:-8080}:80"
+    container_name: auth_app
+    restart: unless-stopped
+    working_dir: /var/www/html
     volumes:
       - ./app:/var/www/html
+    ports:
+      - "8080:80"
     depends_on:
       - db
-    networks:
-      - lab_network
     environment:
-      - DB_HOST=${DB_HOST:-db}
-      - DB_NAME=${DB_NAME:-auth_lab}
-      - DB_USER=${DB_USER:-lab_user}
-      - DB_PASSWORD=${DB_PASSWORD:-lab_password_456}
-      - DB_PORT=${DB_PORT:-5432}
+      # Пробрасываем переменные из .env в контейнер
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
       - RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY}
       - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY}
+    networks:
+      - auth_network
 
+  # PostgreSQL база данных
   db:
     image: postgres:15-alpine
-    container_name: lab_db
+    container_name: auth_db
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME:-auth_lab}
-      POSTGRES_USER: ${DB_USER:-lab_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-lab_password_456}
-    ports:
-      - "${DB_PORT_EXTERNAL:-5432}:5432"
+      # Критически важные переменные для инициализации Postgres
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - pg_data:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     networks:
-      - lab_network
-
-
-
-volumes:
-  pg_data: {}                        
+      - auth_network
 
 networks:
-  lab_network:
+  auth_network:
     driver: bridge
+
+volumes:
+  db_data:

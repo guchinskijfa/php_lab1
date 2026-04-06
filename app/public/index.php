@@ -17,7 +17,7 @@ ini_set('log_errors', '1');
 date_default_timezone_set('Europe/Moscow');
 
 // Load autoloader
-require_once __DIR__ . '/src/autoload.php';
+require_once __DIR__ . '/../src/autoload.php';
 
 // Import classes
 use App\Services\AuthService;
@@ -158,12 +158,12 @@ if ($isLoggedIn) {
     
     // Render dashboard view
     ob_start();
-    include __DIR__ . '/src/Views/partials/dashboard.php';
+    include __DIR__ . '/../src/Views/partials/dashboard.php';
     $content = ob_get_clean();
 } else {
     // Render auth forms view
     ob_start();
-    include __DIR__ . '/src/Views/partials/auth_forms.php';
+    include __DIR__ . '/../src/Views/partials/auth_forms.php';
     $content = ob_get_clean();
 }
 
@@ -266,4 +266,4 @@ $scripts = '<script>
 </script>';
 
 // Render main layout
-include __DIR__ . '/src/Views/layouts/main.php';
+include __DIR__ . '/../src/Views/layouts/main.php';
