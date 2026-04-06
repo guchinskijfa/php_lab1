@@ -54,6 +54,15 @@ if (isset($_POST['register'])) {
     $pass   = $_POST['password'];
     $pass2  = $_POST['confirm_password'];
 
+    // Валидация имени (2-15 символов, только буквы, без пробелов)
+    if (!preg_match('/^[A-Za-zА-Яа-яЁё]{2,15}$/', trim($f_name))) {
+        $errors['first_name'] = "Имя: 2-15 букв, без пробелов.";
+    }
+    // Валидация фамилии (2-15 символов, только буквы, без пробелов - запрет двойных фамилий)
+    if (!preg_match('/^[A-Za-zА-Яа-яЁё]{2,15}$/', trim($l_name))) {
+        $errors['last_name'] = "Фамилия: 2-15 букв, без пробелов (одна фамилия).";
+    }
+
     // Проверка занятости (защита от Warning Postgres)
     $check_res = pg_query_params($conn, "SELECT login, email FROM users WHERE login = $1 OR email = $2", [$u_login, $u_email]);
     while ($row = pg_fetch_assoc($check_res)) {
@@ -62,6 +71,16 @@ if (isset($_POST['register'])) {
     }
 
     if (strlen($u_login) < 6) $errors['login'] = "Логин от 6 символов.";
+    
+    // Валидация сложности пароля
+    if (strlen($pass) < 8 || 
+        !preg_match('/[a-z]/', $pass) || 
+        !preg_match('/[A-Z]/', $pass) || 
+        !preg_match('/\d/', $pass) || 
+        !preg_match('/[\W_]/', $pass)) {
+        $errors['password'] = "Пароль должен содержать: строчные, прописные буквы, цифры и спецсимволы (мин. 8).";
+    }
+    
     if ($pass !== $pass2) $errors['pass2'] = "Пароли не совпадают.";
     if (!$rules_accepted) $errors['rules'] = "Примите правила.";
 
@@ -147,6 +166,15 @@ if (!empty($_GET['usersearch'])) {
     <?php if ($success): ?>
         <div class="alert alert-success"><?= $success ?></div>
     <?php endif; ?>
+    <?php if (isset($errors['first_name']) || isset($errors['last_name']) || isset($errors['password'])): ?>
+        <div class="alert alert-warning">
+            <ul class="mb-0">
+            <?php if (isset($errors['first_name'])): ?><li><?= $errors['first_name'] ?></li><?php endif; ?>
+            <?php if (isset($errors['last_name'])): ?><li><?= $errors['last_name'] ?></li><?php endif; ?>
+            <?php if (isset($errors['password'])): ?><li><?= $errors['password'] ?></li><?php endif; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
 
     <?php if (isset($_SESSION['user_id'])): ?>
         
@@ -211,14 +239,16 @@ if (!empty($_GET['usersearch'])) {
             <!-- Регистрация -->
             <div class="col-md-7 bg-body p-5">
                 <h3 class="mb-4">Регистрация</h3>
-                <form method="POST" id="regForm" novalidate class="row g-3">
+                <form method="POST" id="regForm" novalidate class="row g-3" autocomplete="off">
                     <div class="col-md-6">
                         <label class="form-label small">Имя</label>
-                        <input type="text" name="first_name" class="form-control" value="<?= htmlspecialchars($f_name) ?>" required>
+                        <input type="text" name="first_name" id="first_name" class="form-control" value="<?= htmlspecialchars($f_name) ?>" required minlength="2" maxlength="15" pattern="[A-Za-zА-Яа-яЁё]+" title="Только буквы, от 2 до 15 символов">
+                        <div class="invalid-feedback" id="firstNameFeedback">Имя: 2-15 букв, без пробелов.</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small">Фамилия</label>
-                        <input type="text" name="last_name" class="form-control" value="<?= htmlspecialchars($l_name) ?>" required>
+                        <input type="text" name="last_name" id="last_name" class="form-control" value="<?= htmlspecialchars($l_name) ?>" required minlength="2" maxlength="15" pattern="[A-Za-zА-Яа-яЁё]+" title="Только буквы, от 2 до 15 символов">
+                        <div class="invalid-feedback" id="lastNameFeedback">Фамилия: 2-15 букв, без пробелов (одна фамилия).</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label small">Email</label>
@@ -232,7 +262,8 @@ if (!empty($_GET['usersearch'])) {
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small">Пароль</label>
-                        <input type="password" name="password" id="password" class="form-control" required>
+                        <input type="password" name="password" id="password" class="form-control" required minlength="8" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}" title="Минимум 8 символов: строчные, прописные буквы, цифры и спецсимволы">
+                        <div class="invalid-feedback" id="passwordFeedback">Пароль должен содержать: строчные, прописные буквы, цифры и спецсимволы (мин. 8).</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small">Повтор пароля</label>
@@ -303,7 +334,9 @@ if (!empty($_GET['usersearch'])) {
 
     const patterns = {
         email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-        login: /^.{6,}$/
+        login: /^.{6,}$/,
+        name: /^[A-Za-zА-Яа-яЁё]{2,15}$/,
+        password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/
     };
 
     // AJAX проверка
@@ -322,12 +355,23 @@ if (!empty($_GET['usersearch'])) {
 
         if (field.type === 'checkbox') {
             isValid = field.checked;
+        } else if (field.name === 'first_name' || field.name === 'last_name') {
+            // Проверка на пробелы (двойные фамилии/имена)
+            if (field.value.includes(' ')) {
+                isValid = false;
+                errorMsg = "Только одно слово, без пробелов.";
+            } else if (!patterns.name.test(field.value)) {
+                isValid = false;
+                errorMsg = "2-15 букв, только кириллица или латиница.";
+            }
         } else if (field.name === 'email' || field.name === 'login') {
             isValid = patterns[field.name].test(field.value);
             if (isValid) {
                 const taken = await checkAvailability(field.name, field.value);
                 if (taken) { isValid = false; errorMsg = "Уже занято в базе"; }
             }
+        } else if (field.name === 'password') {
+            isValid = patterns.password.test(field.value);
         } else if (field.name === 'confirm_password') {
             isValid = field.value === document.getElementById('password').value && field.value !== '';
         }
